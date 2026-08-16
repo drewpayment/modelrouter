@@ -72,6 +72,21 @@ curl -s "$(jq -r .endpoints.api ~/.config/litellm/github_copilot/api-key.json)/m
   -H "Editor-Version: vscode/1.85.1" | jq -r '.data[].id'
 ```
 
+## Auto Router (`smart_router`)
+
+`smart_router` is defined in `config.yaml`: a local LLM classifier (`local-model`)
+assigns each request a complexity tier; SIMPLE/MEDIUM route to the local Qwen,
+COMPLEX/REASONING to `copilot-claude-opus-5`. Edit it in `config.yaml`, not the
+Admin UI — a UI edit would create a second, database-stored copy.
+
+## Replicating on another machine
+
+Everything is in this repo except per-machine state:
+
+1. Clone, then follow Setup and Run above (`.env` values are machine-local).
+2. Run oMLX with the same model IDs used in `config.yaml` (or update the IDs).
+3. Authenticate Copilot once: `uv run python scripts/copilot_auth.py`.
+
 ## Spend tracking
 
 Copilot bills by subscription, so `config.yaml` assigns each `copilot-*` model its

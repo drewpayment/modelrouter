@@ -106,6 +106,41 @@ model_list:
     litellm_params:
       model: "github_copilot/*"
 
+  # ---------- Auto Router ----------
+  # Complexity router: a local LLM classifier assigns each request a tier,
+  # and the tier maps to a model. Exported from the Admin UI so the whole
+  # setup is reproducible from this file.
+  - model_name: smart_router
+    litellm_params:
+      model: auto_router/complexity_router
+      complexity_router_default_model: Qwen3.6-35B-A3B-oQ6-fp16-mtp
+      complexity_router_config:
+        classifier_type: llm
+        classifier_llm_config:
+          model: local-model
+          timeout_ms: 3000
+        classifier_context_window_size: 3
+        classifier_context_per_turn_chars: 200
+        adaptive: true
+        adaptive_eligible: all
+        adaptive_weights:
+          cost: 0.6
+          quality: 0.4
+        session_affinity: false
+        escalation_keywords:
+          - LITELLM ESCALATE
+        return_raw_model_name: true
+        tier_distance_penalty: 0.5
+        tiers:
+          SIMPLE:
+            - Qwen3.6-35B-A3B-oQ6-fp16-mtp
+          MEDIUM:
+            - Qwen3.6-35B-A3B-oQ6-fp16-mtp
+          COMPLEX:
+            - copilot-claude-opus-5
+          REASONING:
+            - copilot-claude-opus-5
+
 litellm_settings:
   drop_params: true # strip OpenAI params a backend doesn't support instead of erroring
 
