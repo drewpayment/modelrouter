@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "ok": false,
+  "command": "visual-check",
+  "status": "skipped",
+  "visualReview": "pending",
+  "artifact": {
+    "path": "/Users/drewpayment/dev/modelrouter/docs/architecture.html",
+    "sha256": "91a1d780cccb61b32ff1114507e512a3c81c9c043d4dfc842de3325477941614",
+    "bytes": 636243
+  },
+  "state": {
+    "detail": "read",
+    "motion": "still"
+  },
+  "chrome": {
+    "status": "unavailable",
+    "executable": null
+  },
+  "containment": {
+    "status": "skipped",
+    "viewports": []
+  },
+  "captures": {
+    "status": "skipped",
+    "screenshots": [],
+    "contactSheet": null
+  },
+  "sidecars": {
+    "receipt": "architecture.visual-check.json",
+    "contactSheet": "architecture.visual-check.html"
+  },
+  "error": "Chrome or Chromium is unavailable. Set ARCHIFY_CHROME to its executable path."
+}

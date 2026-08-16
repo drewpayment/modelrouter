@@ -1,0 +1,14 @@
+[project]
+name = "modelrouter"
+version = "0.1.0"
+description = "LiteLLM proxy routing between local oMLX and GitHub Copilot"
+requires-python = ">=3.11"
+dependencies = [
+    "litellm[proxy]>=1.74",
+    # litellm 1.97 imports fastapi internals removed in fastapi 0.140+
+    "fastapi<0.140",
+    # DB client for the admin UI / virtual keys (litellm uses prisma-client-py)
+    "prisma",
+    # Required by litellm's Auto Router feature
+    "semantic-router",
+]

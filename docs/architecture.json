@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "modelrouter Reference Architecture",
+    "output": "architecture.html",
+    "quality_profile": "showcase",
+    "views": [
+      { "id": "inference-path", "label": "Inference path", "focus": ["clients", "proxy", "omlx"], "note": "Default path: an OpenAI-compatible client calls local-model and is served by the local oMLX server." },
+      { "id": "fallback-path", "label": "Copilot fallback", "focus": ["proxy", "copilot", "authcache"], "note": "When oMLX is down, local-model falls back to copilot-gpt-4.1 using the cached device-flow token." },
+      { "id": "control-plane", "label": "Control plane", "focus": ["adminui", "proxy", "postgres"], "note": "The Admin UI, virtual keys, and spend tracking all depend on the Postgres container." }
+    ]
+  },
+  "components": [
+    { "id": "adminui", "type": "frontend", "label": "Admin UI", "sublabel": "browser /ui", "pos": [40, 80], "size": [150, 64] },
+    { "id": "clients", "type": "external", "label": "API Clients", "sublabel": "OpenAI-compatible SDKs", "pos": [40, 280], "size": [150, 68] },
+    { "id": "authcache", "type": "security", "label": "Copilot Token Cache", "sublabel": "~/.config/litellm", "pos": [340, 80], "size": [160, 64], "tag": "device flow" },
+    { "id": "proxy", "type": "backend", "label": "LiteLLM Proxy", "sublabel": "config.yaml :4000", "pos": [340, 280], "size": [160, 68] },
+    { "id": "postgres", "type": "database", "label": "PostgreSQL", "sublabel": "docker :5432", "pos": [340, 500], "size": [160, 64] },
+    { "id": "copilot", "type": "cloud", "label": "GitHub Copilot API", "sublabel": "claude / gpt / gemini", "pos": [700, 80], "size": [170, 68] },
+    { "id": "omlx", "type": "cloud", "label": "oMLX Server", "sublabel": "127.0.0.1:8000", "pos": [700, 280], "size": [170, 68] },
+    { "id": "embeddings", "type": "cloud", "label": "Embeddings", "sublabel": "Qwen3-Embedding-0.6B", "pos": [700, 500], "size": [170, 64] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "Local machine (Apple Silicon)", "wraps": ["authcache", "proxy", "postgres", "omlx", "embeddings"] }
+  ],
+  "connections": [
+    { "id": "clients-to-proxy", "from": "clients", "to": "proxy", "label": "/v1", "variant": "emphasis", "labelAt": [220, 308] },
+    { "id": "adminui-to-proxy", "from": "adminui", "to": "proxy", "label": "admin session", "labelAt": [265, 140] },
+    { "id": "token-to-proxy", "from": "authcache", "to": "proxy", "label": "bearer token", "variant": "security", "labelDy": 24 },
+    { "id": "proxy-to-postgres", "from": "proxy", "to": "postgres", "label": "keys + spend", "labelDy": 24 },
+    { "id": "proxy-to-omlx", "from": "proxy", "to": "omlx", "label": "local-model", "variant": "emphasis", "labelAt": [530, 290] },
+    { "id": "proxy-to-copilot", "from": "proxy", "to": "copilot", "label": "fallback", "variant": "dashed", "labelAt": [600, 140] },
+    { "id": "proxy-to-embeddings", "from": "proxy", "to": "embeddings", "label": "/v1/embeddings" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Entry points", "items": ["OpenAI-compatible /v1 on port 4000", "Anthropic-style /v1/messages", "Admin UI at /ui, password = LITELLM_MASTER_KEY"] },
+    { "dot": "emerald", "title": "Routing", "items": ["local-model resolves to oMLX Qwen3.6-35B-A3B-oQ6-fp16-mtp", "num_retries: 2, then falls back to copilot-gpt-4.1", "github_copilot/* wildcard passes any Copilot model through"] },
+    { "dot": "rose", "title": "State and auth", "items": ["Postgres backs virtual keys, spend, and store_model_in_db", "Copilot device-flow tokens cached outside the repo", "oMLX authenticated with OMLX_API_KEY from .env"] }
+  ]
+}

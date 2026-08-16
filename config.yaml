@@ -1,0 +1,120 @@
+# LiteLLM proxy config — routes between local oMLX (Apple Silicon) and GitHub Copilot.
+# Run: uv run --env-file .env litellm --config config.yaml --port 4000
+
+model_list:
+  # ---------- Local oMLX models (http://127.0.0.1:8000) ----------
+  # Default local alias — clients that just want "the local model" use this.
+  # Falls back to Copilot if oMLX is down (see router_settings below).
+  - model_name: local-model
+    litellm_params:
+      model: openai/Qwen3.6-35B-A3B-oQ6-fp16-mtp
+      api_base: http://127.0.0.1:8000/v1
+      api_key: os.environ/OMLX_API_KEY
+
+  - model_name: Qwen3.6-35B-A3B-MLX-8bit
+    litellm_params:
+      model: openai/Qwen3.6-35B-A3B-MLX-8bit
+      api_base: http://127.0.0.1:8000/v1
+      api_key: os.environ/OMLX_API_KEY
+
+  - model_name: Qwen3.6-35B-A3B-oQ6-fp16-mtp
+    litellm_params:
+      model: openai/Qwen3.6-35B-A3B-oQ6-fp16-mtp
+      api_base: http://127.0.0.1:8000/v1
+      api_key: os.environ/OMLX_API_KEY
+
+  - model_name: Qwen3.8-27B-8bit
+    litellm_params:
+      model: openai/Qwen3.8-27B-8bit
+      api_base: http://127.0.0.1:8000/v1
+      api_key: os.environ/OMLX_API_KEY
+
+  - model_name: Qwen3.8-27B-MLX-8bit
+    litellm_params:
+      model: openai/Qwen3.8-27B-MLX-8bit
+      api_base: http://127.0.0.1:8000/v1
+      api_key: os.environ/OMLX_API_KEY
+
+  - model_name: Qwen3.8-27B-oQ8e-mtp
+    litellm_params:
+      model: openai/Qwen3.8-27B-oQ8e-mtp
+      api_base: http://127.0.0.1:8000/v1
+      api_key: os.environ/OMLX_API_KEY
+
+  # Local embeddings (used by the Auto Router for prompt classification)
+  - model_name: local-embeddings
+    litellm_params:
+      model: openai/Qwen3-Embedding-0.6B-4bit-DWQ
+      api_base: http://127.0.0.1:8000/v1
+      api_key: os.environ/OMLX_API_KEY
+    model_info:
+      mode: embedding
+
+  # ---------- GitHub Copilot ----------
+  # Auth: run `uv run python scripts/copilot_auth.py` once (device flow).
+  #
+  # Frontier models pinned explicitly so they appear in /v1/models and the
+  # Admin UI: litellm's wildcard expansion uses its bundled (stale) registry,
+  # not Copilot's live /models endpoint. See README for listing live models.
+  # Copilot bills by subscription, not per token. The costs below are the
+  # providers' direct-API list prices (per token), so the Cost tab shows what
+  # this usage would cost via direct APIs. Wildcard requests still record $0.
+  - model_name: copilot-gpt-4.1
+    litellm_params:
+      model: github_copilot/gpt-4.1
+      input_cost_per_token: 0.000002 # $2/M (OpenAI list)
+      output_cost_per_token: 0.000008 # $8/M
+
+  - model_name: copilot-claude-fable-5
+    litellm_params:
+      model: github_copilot/claude-fable-5
+      input_cost_per_token: 0.00001 # $10/M (Anthropic list)
+      output_cost_per_token: 0.00005 # $50/M
+
+  - model_name: copilot-claude-opus-5
+    litellm_params:
+      model: github_copilot/claude-opus-5
+      input_cost_per_token: 0.000005 # $5/M
+      output_cost_per_token: 0.000025 # $25/M
+
+  - model_name: copilot-claude-sonnet-5
+    litellm_params:
+      model: github_copilot/claude-sonnet-5
+      input_cost_per_token: 0.000003 # $3/M
+      output_cost_per_token: 0.000015 # $15/M
+
+  - model_name: copilot-claude-haiku-4.5
+    litellm_params:
+      model: github_copilot/claude-haiku-4.5
+      input_cost_per_token: 0.000001 # $1/M
+      output_cost_per_token: 0.000005 # $5/M
+
+  - model_name: copilot-gpt-5.5
+    litellm_params:
+      model: github_copilot/gpt-5.5
+      input_cost_per_token: 0.000005 # $5/M (OpenAI list)
+      output_cost_per_token: 0.00003 # $30/M
+
+  - model_name: copilot-gemini-3.1-pro
+    litellm_params:
+      model: github_copilot/gemini-3.1-pro-preview
+      input_cost_per_token: 0.000002 # $2/M (Google list, <=200K prompts)
+      output_cost_per_token: 0.000012 # $12/M
+
+  # Wildcard passthrough: request any "github_copilot/<model>" directly.
+  - model_name: "github_copilot/*"
+    litellm_params:
+      model: "github_copilot/*"
+
+litellm_settings:
+  drop_params: true # strip OpenAI params a backend doesn't support instead of erroring
+
+router_settings:
+  num_retries: 2
+  fallbacks:
+    - { "local-model": ["copilot-gpt-4.1"] }
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  # Allow models/routers added in the Admin UI to be saved to Postgres
+  store_model_in_db: true
