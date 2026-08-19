@@ -1,5 +1,9 @@
 # LiteLLM proxy config — routes between local oMLX (Apple Silicon) and GitHub Copilot.
-# Run: uv run --env-file .env litellm --config config.yaml --port 4000
+# Run in Docker: docker compose --env-file .env up -d --build
+# Run natively:  uv run --env-file .env litellm --config config.yaml --port 4000
+#
+# OMLX_API_BASE differs per runtime: 127.0.0.1 natively, host.docker.internal
+# from the container (docker-compose.yml sets it).
 
 model_list:
   # ---------- Local oMLX models (http://127.0.0.1:8000) ----------
@@ -8,44 +12,44 @@ model_list:
   - model_name: local-model
     litellm_params:
       model: openai/Qwen3.6-35B-A3B-oQ6-fp16-mtp
-      api_base: http://127.0.0.1:8000/v1
+      api_base: os.environ/OMLX_API_BASE
       api_key: os.environ/OMLX_API_KEY
 
   - model_name: Qwen3.6-35B-A3B-MLX-8bit
     litellm_params:
       model: openai/Qwen3.6-35B-A3B-MLX-8bit
-      api_base: http://127.0.0.1:8000/v1
+      api_base: os.environ/OMLX_API_BASE
       api_key: os.environ/OMLX_API_KEY
 
   - model_name: Qwen3.6-35B-A3B-oQ6-fp16-mtp
     litellm_params:
       model: openai/Qwen3.6-35B-A3B-oQ6-fp16-mtp
-      api_base: http://127.0.0.1:8000/v1
+      api_base: os.environ/OMLX_API_BASE
       api_key: os.environ/OMLX_API_KEY
 
   - model_name: Qwen3.8-27B-8bit
     litellm_params:
       model: openai/Qwen3.8-27B-8bit
-      api_base: http://127.0.0.1:8000/v1
+      api_base: os.environ/OMLX_API_BASE
       api_key: os.environ/OMLX_API_KEY
 
   - model_name: Qwen3.8-27B-MLX-8bit
     litellm_params:
       model: openai/Qwen3.8-27B-MLX-8bit
-      api_base: http://127.0.0.1:8000/v1
+      api_base: os.environ/OMLX_API_BASE
       api_key: os.environ/OMLX_API_KEY
 
   - model_name: Qwen3.8-27B-oQ8e-mtp
     litellm_params:
       model: openai/Qwen3.8-27B-oQ8e-mtp
-      api_base: http://127.0.0.1:8000/v1
+      api_base: os.environ/OMLX_API_BASE
       api_key: os.environ/OMLX_API_KEY
 
   # Local embeddings (used by the Auto Router for prompt classification)
   - model_name: local-embeddings
     litellm_params:
       model: openai/Qwen3-Embedding-0.6B-4bit-DWQ
-      api_base: http://127.0.0.1:8000/v1
+      api_base: os.environ/OMLX_API_BASE
       api_key: os.environ/OMLX_API_KEY
     model_info:
       mode: embedding
@@ -143,6 +147,7 @@ model_list:
 
 litellm_settings:
   drop_params: true # strip OpenAI params a backend doesn't support instead of erroring
+  success_callback: ["resend_email"] # send emails via Resend
 
 router_settings:
   num_retries: 2
@@ -153,3 +158,4 @@ general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY
   # Allow models/routers added in the Admin UI to be saved to Postgres
   store_model_in_db: true
+  alerting: ['email'] # trigger email notifications (key created, user invited, budget alerts)

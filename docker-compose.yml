@@ -1,6 +1,46 @@
-# Postgres for the LiteLLM Admin UI, virtual keys, and spend tracking.
-# Start with: docker compose up -d
+# The litellm proxy plus its Postgres (Admin UI, virtual keys, spend tracking).
+# Start with: docker compose --env-file .env up -d --build
+#
+# oMLX stays on the host (it needs Apple Silicon / Metal); the proxy reaches it
+# through host.docker.internal.
 services:
+  litellm:
+    build: .
+    image: modelrouter-litellm
+    container_name: modelrouter-litellm
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      # Override the .env values, which are written for native (host) runs.
+      DATABASE_URL: postgresql://litellm:${POSTGRES_PASSWORD:?set in .env}@postgres:5432/litellm
+      OMLX_API_BASE: ${OMLX_API_BASE_DOCKER:-http://host.docker.internal:8000/v1}
+      # Resend email
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL}
+      PROXY_BASE_URL: ${PROXY_BASE_URL}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:4000:4000"
+    volumes:
+      # Live config edits: `docker compose restart litellm` picks them up.
+      - ./config.yaml:/app/config.yaml:ro
+      # GitHub Copilot device-flow tokens, shared with native runs.
+      - ${HOME}/.config/litellm/github_copilot:/root/.config/litellm/github_copilot
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:4000/health/liveliness')
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
+
   postgres:
     image: postgres:16
     container_name: modelrouter-postgres
@@ -13,6 +53,11 @@ services:
       - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U litellm -d litellm"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
 volumes:
   pgdata:

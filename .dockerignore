@@ -1,0 +1,8 @@
+.venv/
+.git/
+.pi/
+.env
+docs/
+__pycache__/
+*.log
+README.md
