@@ -104,6 +104,15 @@ uv run python scripts/patch_litellm.py
 
 ## Test
 
+Static checks (no running proxy, oMLX, or Postgres needed) — validates
+`config.yaml`, its `.env` references, routing targets, and the model table above:
+
+```sh
+uv run python scripts/check_config.py
+```
+
+Live smoke test:
+
 ```sh
 curl http://localhost:4000/v1/chat/completions \
   -H "Authorization: Bearer $LITELLM_MASTER_KEY" \
@@ -113,3 +122,12 @@ curl http://localhost:4000/v1/chat/completions \
 
 Point any OpenAI-compatible client at `http://localhost:4000/v1` with the master key.
 LiteLLM also exposes an Anthropic-style `/v1/messages` endpoint.
+
+## Working on this repo with an AI assistant
+
+`CLAUDE.md` is the orientation document for AI agents: repo map, invariants
+(config.yaml is the source of truth, not the Admin UI), what has to be verified
+on this machine, and the known gotchas. `AGENTS.md` points other tools at it.
+For a structured audit, the `modelrouter-review` skill in
+`.claude/skills/` walks Claude Code through reviewing config, docs, and secret
+hygiene.
