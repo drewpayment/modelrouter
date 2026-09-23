@@ -20,14 +20,30 @@ services:
       # Resend email
       RESEND_API_KEY: ${RESEND_API_KEY}
       RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL}
-      PROXY_BASE_URL: ${PROXY_BASE_URL}
+      # PROXY_BASE_URL is deliberately NOT set. It is a single global override
+      # that pins the Admin UI's API base to one address; every other address
+      # then serves a UI whose data calls point somewhere else. Left unset, the
+      # UI derives its base from window.location.origin, so localhost, the LAN
+      # IP and the *.orb.local domain all work at once, and nothing breaks when
+      # DHCP moves the LAN IP. Emailed invite/alert links fall back to the base
+      # URL of the request that triggered them - so send invites from the
+      # address the recipient can reach. Set this only behind a stable public
+      # hostname / reverse proxy.
+      # PROXY_BASE_URL: ${PROXY_BASE_URL}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
-      - "127.0.0.1:4000:4000"
+      # All interfaces: reachable from other machines on the LAN.
+      # The master key is the only gate - mint per-device virtual keys in the
+      # Admin UI rather than handing the master key out. Postgres below stays
+      # on 127.0.0.1 deliberately; no client needs the database directly.
+      - "4000:4000"
     volumes:
       # Live config edits: `docker compose restart litellm` picks them up.
       - ./config.yaml:/app/config.yaml:ro
+      # Custom provider handlers config.yaml imports (providers.jev); must
+      # sit next to config.yaml. Restart after editing, like config.yaml.
+      - ./providers:/app/providers:ro
       # GitHub Copilot device-flow tokens, shared with native runs.
       - ${HOME}/.config/litellm/github_copilot:/root/.config/litellm/github_copilot
     healthcheck:

@@ -1,0 +1,187 @@
+[
+  {
+    "model_name": "smart_router",
+    "litellm_params": {
+      "use_in_pass_through": false,
+      "use_litellm_proxy": false,
+      "use_xai_oauth": false,
+      "merge_reasoning_content_in_choices": false,
+      "complexity_router_config": {
+        "tiers": {
+          "MEDIUM": [
+            "local-balanced"
+          ],
+          "SIMPLE": [
+            "local-fast"
+          ],
+          "COMPLEX": [
+            "copilot-claude-opus-5"
+          ],
+          "REASONING": [
+            "copilot-claude-opus-5"
+          ]
+        },
+        "adaptive": true,
+        "classifier_type": "llm",
+        "adaptive_weights": {
+          "cost": 0.6,
+          "quality": 0.4
+        },
+        "session_affinity": false,
+        "adaptive_eligible": "all",
+        "escalation_keywords": [
+          "LITELLM ESCALATE"
+        ],
+        "classifier_llm_config": {
+          "model": "local-fast",
+          "timeout_ms": 3000
+        },
+        "return_raw_model_name": true,
+        "tier_distance_penalty": 0.5,
+        "classifier_context_window_size": 3,
+        "classifier_context_per_turn_chars": 200
+      },
+      "complexity_router_default_model": "local-balanced",
+      "model": "auto_router/complexity_router"
+    }
+  },
+  {
+    "model_name": "smart_router_frontier",
+    "litellm_params": {
+      "use_in_pass_through": false,
+      "use_litellm_proxy": false,
+      "use_xai_oauth": false,
+      "merge_reasoning_content_in_choices": false,
+      "complexity_router_config": {
+        "tiers": {
+          "MEDIUM": [
+            "copilot-claude-sonnet-5"
+          ],
+          "SIMPLE": [
+            "local-fast"
+          ],
+          "COMPLEX": [
+            "copilot-claude-opus-5"
+          ],
+          "REASONING": [
+            "copilot-claude-opus-5"
+          ]
+        },
+        "adaptive": true,
+        "classifier_type": "llm",
+        "adaptive_weights": {
+          "cost": 0.6,
+          "quality": 0.4
+        },
+        "session_affinity": false,
+        "adaptive_eligible": "all",
+        "escalation_keywords": [
+          "LITELLM ESCALATE"
+        ],
+        "classifier_llm_config": {
+          "model": "local-fast",
+          "timeout_ms": 3000
+        },
+        "return_raw_model_name": true,
+        "tier_distance_penalty": 0.5,
+        "classifier_context_window_size": 3,
+        "classifier_context_per_turn_chars": 200
+      },
+      "complexity_router_default_model": "copilot-claude-sonnet-5",
+      "model": "auto_router/complexity_router"
+    }
+  },
+  {
+    "model_name": "smart_router_local",
+    "litellm_params": {
+      "use_in_pass_through": false,
+      "use_litellm_proxy": false,
+      "use_xai_oauth": false,
+      "merge_reasoning_content_in_choices": false,
+      "complexity_router_config": {
+        "tiers": {
+          "MEDIUM": [
+            "local-balanced"
+          ],
+          "SIMPLE": [
+            "local-fast"
+          ],
+          "COMPLEX": [
+            "local-deep"
+          ],
+          "REASONING": [
+            "local-deep"
+          ]
+        },
+        "adaptive": true,
+        "classifier_type": "llm",
+        "adaptive_weights": {
+          "cost": 0.6,
+          "quality": 0.4
+        },
+        "session_affinity": false,
+        "adaptive_eligible": "all",
+        "escalation_keywords": [
+          "LITELLM ESCALATE"
+        ],
+        "classifier_llm_config": {
+          "model": "local-fast",
+          "timeout_ms": 3000
+        },
+        "return_raw_model_name": true,
+        "tier_distance_penalty": 0.5,
+        "classifier_context_window_size": 3,
+        "classifier_context_per_turn_chars": 200
+      },
+      "complexity_router_default_model": "local-balanced",
+      "model": "auto_router/complexity_router"
+    }
+  },
+  {
+    "model_name": "smart_router_hybrid",
+    "litellm_params": {
+      "use_in_pass_through": false,
+      "use_litellm_proxy": false,
+      "use_xai_oauth": false,
+      "merge_reasoning_content_in_choices": false,
+      "complexity_router_config": {
+        "tiers": {
+          "MEDIUM": [
+            "local-balanced"
+          ],
+          "SIMPLE": [
+            "local-fast"
+          ],
+          "COMPLEX": [
+            "vercel-deepseek-v4.1-flash"
+          ],
+          "REASONING": [
+            "copilot-claude-opus-5.5"
+          ]
+        },
+        "adaptive": true,
+        "classifier_type": "llm",
+        "adaptive_weights": {
+          "cost": 0.6,
+          "quality": 0.4
+        },
+        "session_affinity": false,
+        "adaptive_eligible": "all",
+        "escalation_keywords": [
+          "LITELLM ESCALATE"
+        ],
+        "classifier_llm_config": {
+          "model": "jev-classifier",
+          "timeout_ms": 3000
+        },
+        "return_raw_model_name": true,
+        "tier_distance_penalty": 0.5,
+        "classifier_context_window_size": 3,
+        "classifier_context_per_turn_chars": 200,
+        "classifier_fallback": "heuristic"
+      },
+      "complexity_router_default_model": "local-balanced",
+      "model": "auto_router/complexity_router"
+    }
+  }
+]
