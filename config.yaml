@@ -5,52 +5,87 @@
 # OMLX_API_BASE differs per runtime: 127.0.0.1 natively, host.docker.internal
 # from the container (docker-compose.yml sets it).
 
+# Shared oMLX connection settings. Not a litellm key - it is a YAML anchor,
+# merged into each local entry below with `<<: *omlx`. litellm ignores unknown
+# top-level keys, so this is safe.
+x_omlx: &omlx
+  api_base: os.environ/OMLX_API_BASE
+  api_key: os.environ/OMLX_API_KEY
+
 model_list:
-  # ---------- Local oMLX models (http://127.0.0.1:8000) ----------
-  # Default local alias — clients that just want "the local model" use this.
-  # Falls back to Copilot if oMLX is down (see router_settings below).
+  # ---------- Layer 1: role aliases (the switchboard) ----------
+  # These stable names are the ONLY local models the auto-routers, fallbacks
+  # and clients should reference. To put a different oMLX model behind a role,
+  # change that one `model:` line - nothing downstream moves.
+  - model_name: local-fast # classifier + SIMPLE tier; MoE, 3B active, MTP
+    litellm_params:
+      <<: *omlx
+      # Ornith matches Qwen3.6-35B-A3B's answers at the same throughput
+      # (~101 vs ~104 tok/s) while spending 2.5-6x fewer tokens to get there.
+      model: openai/Ornith-1.5-35B-A3B-oQ6e-mtp
+
+  - model_name: local-balanced # MEDIUM tier; the everyday workhorse
+    litellm_params:
+      <<: *omlx
+      # Dense 27B at 4-bit: slower than the 35B-A3B MoE but stronger on
+      # mid-difficulty work. local-deep keeps the 8-bit build of the same model.
+      model: openai/Qwen3.8-27B-oQ4e-mtp
+
+  - model_name: local-deep # strongest local; COMPLEX tier when staying offline
+    litellm_params:
+      <<: *omlx
+      model: openai/Qwen3.8-27B-oQ8e-mtp
+
+  # Default local alias kept for clients that hardcode it. Falls back to
+  # Copilot if oMLX is down (see router_settings below).
   - model_name: local-model
     litellm_params:
+      <<: *omlx
       model: openai/Qwen3.6-35B-A3B-oQ6-fp16-mtp
-      api_base: os.environ/OMLX_API_BASE
-      api_key: os.environ/OMLX_API_KEY
+
+  # ---------- Layer 2: raw oMLX IDs (escape hatch) ----------
+  # Address a specific weight file directly, bypassing the roles above.
+  # Must match the IDs oMLX serves (GET http://127.0.0.1:8000/v1/models).
+  - model_name: Ornith-1.5-35B-A3B-oQ6e-mtp
+    litellm_params:
+      <<: *omlx
+      model: openai/Ornith-1.5-35B-A3B-oQ6e-mtp
 
   - model_name: Qwen3.6-35B-A3B-MLX-8bit
     litellm_params:
+      <<: *omlx
       model: openai/Qwen3.6-35B-A3B-MLX-8bit
-      api_base: os.environ/OMLX_API_BASE
-      api_key: os.environ/OMLX_API_KEY
 
   - model_name: Qwen3.6-35B-A3B-oQ6-fp16-mtp
     litellm_params:
+      <<: *omlx
       model: openai/Qwen3.6-35B-A3B-oQ6-fp16-mtp
-      api_base: os.environ/OMLX_API_BASE
-      api_key: os.environ/OMLX_API_KEY
 
   - model_name: Qwen3.8-27B-8bit
     litellm_params:
+      <<: *omlx
       model: openai/Qwen3.8-27B-8bit
-      api_base: os.environ/OMLX_API_BASE
-      api_key: os.environ/OMLX_API_KEY
 
   - model_name: Qwen3.8-27B-MLX-8bit
     litellm_params:
+      <<: *omlx
       model: openai/Qwen3.8-27B-MLX-8bit
-      api_base: os.environ/OMLX_API_BASE
-      api_key: os.environ/OMLX_API_KEY
+
+  - model_name: Qwen3.8-27B-oQ4e-mtp
+    litellm_params:
+      <<: *omlx
+      model: openai/Qwen3.8-27B-oQ4e-mtp
 
   - model_name: Qwen3.8-27B-oQ8e-mtp
     litellm_params:
+      <<: *omlx
       model: openai/Qwen3.8-27B-oQ8e-mtp
-      api_base: os.environ/OMLX_API_BASE
-      api_key: os.environ/OMLX_API_KEY
 
   # Local embeddings (used by the Auto Router for prompt classification)
   - model_name: local-embeddings
     litellm_params:
+      <<: *omlx
       model: openai/Qwen3-Embedding-0.6B-4bit-DWQ
-      api_base: os.environ/OMLX_API_BASE
-      api_key: os.environ/OMLX_API_KEY
     model_info:
       mode: embedding
 
@@ -105,47 +140,42 @@ model_list:
       input_cost_per_token: 0.000002 # $2/M (Google list, <=200K prompts)
       output_cost_per_token: 0.000012 # $12/M
 
+  - model_name: copilot-claude-opus-5.5 # smart_router_hybrid's REASONING tier
+    litellm_params:
+      model: github_copilot/claude-opus-5.5
+      input_cost_per_token: 0.000004 # $4/M (Anthropic list)
+      output_cost_per_token: 0.00002 # $20/M
+
   # Wildcard passthrough: request any "github_copilot/<model>" directly.
   - model_name: "github_copilot/*"
     litellm_params:
       model: "github_copilot/*"
 
-  # ---------- Auto Router ----------
-  # Complexity router: a local LLM classifier assigns each request a tier,
-  # and the tier maps to a model. Exported from the Admin UI so the whole
-  # setup is reproducible from this file.
-  - model_name: smart_router
+  # ---------- Vercel AI Gateway ----------
+  # One AI_GATEWAY_API_KEY covers both entries; billed through the gateway.
+  - model_name: vercel-deepseek-v4.1-flash # smart_router_hybrid's COMPLEX tier
     litellm_params:
-      model: auto_router/complexity_router
-      complexity_router_default_model: Qwen3.6-35B-A3B-oQ6-fp16-mtp
-      complexity_router_config:
-        classifier_type: llm
-        classifier_llm_config:
-          model: local-model
-          timeout_ms: 3000
-        classifier_context_window_size: 3
-        classifier_context_per_turn_chars: 200
-        adaptive: true
-        adaptive_eligible: all
-        adaptive_weights:
-          cost: 0.6
-          quality: 0.4
-        session_affinity: false
-        escalation_keywords:
-          - LITELLM ESCALATE
-        return_raw_model_name: true
-        tier_distance_penalty: 0.5
-        tiers:
-          SIMPLE:
-            - Qwen3.6-35B-A3B-oQ6-fp16-mtp
-          MEDIUM:
-            - Qwen3.6-35B-A3B-oQ6-fp16-mtp
-          COMPLEX:
-            - copilot-claude-opus-5
-          REASONING:
-            - copilot-claude-opus-5
+      model: vercel_ai_gateway/deepseek/deepseek-v4.1-flash
+      api_key: os.environ/AI_GATEWAY_API_KEY
+      input_cost_per_token: 0.0000003 # $0.30/M (gateway list)
+      output_cost_per_token: 0.0000012 # $1.20/M
+
+  # TypeSafe AI's Jev, an evaluation model - NOT a chat model. The gateway only
+  # serves it on /v1/evaluate, so it goes through the `jev` custom provider
+  # (providers/jev.py), which answers the complexity router's classifier call
+  # and nothing else. Use it only as classifier_llm_config.model.
+  - model_name: jev-classifier
+    litellm_params:
+      model: jev/typesafe-ai/jev
+      api_key: os.environ/AI_GATEWAY_API_KEY
+      input_cost_per_token: 0.000000042 # $0.042/M (gateway list; output is free)
+      output_cost_per_token: 0
 
 litellm_settings:
+  # Registers the `jev` provider. The handler path resolves relative to this
+  # file, so providers/ must sit next to config.yaml (Dockerfile + compose do).
+  custom_provider_map:
+    - { "provider": "jev", "custom_handler": "providers.jev.jev_classifier" }
   drop_params: true # strip OpenAI params a backend doesn't support instead of erroring
   success_callback: ["resend_email"] # send emails via Resend
 

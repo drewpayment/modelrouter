@@ -1,16 +1,18 @@
-"""Static consistency checks for config.yaml, .env.example, and README.md.
+"""Static consistency checks for config.yaml, routers.seed.json, .env.example, and README.md.
 
 Nothing here talks to a network or a running proxy, so it works on any
 machine (CI, a Linux box, an AI agent's sandbox) without oMLX, Copilot
 credentials, or the Postgres container. It catches the drift that actually
 bites this repo: a fallback or router tier pointing at a model_name that no
-longer exists, an os.environ/ reference with no matching key in .env.example,
-a pinned copilot-* model missing the cost fields the Usage tab depends on,
-and models documented in one file but not the other.
+longer exists (in either config.yaml or the DB-backed routers.seed.json), an
+os.environ/ reference with no matching key in .env.example, a pinned copilot-*
+model missing the cost fields the Usage tab depends on, and models documented
+in one file but not the other.
 
 Usage: uv run python scripts/check_config.py   (or: python3 scripts/check_config.py)
 """
 
+import json
 import re
 import subprocess
 import sys
@@ -83,42 +85,76 @@ def check_env_refs(config: dict, declared_env: set[str]) -> None:
             error(f"config.yaml references os.environ/{ref}, which is not in .env.example")
 
 
+def known_model(target: str, known: set[str]) -> bool:
+    # A wildcard entry such as "github_copilot/*" covers any model under it.
+    if target in known:
+        return True
+    return any(n.endswith("/*") and target.startswith(n[:-1]) for n in known)
+
+
+def check_router_entry(name: str, params: dict, known: set[str]) -> None:
+    """Check one auto_router's targets against the declared model names.
+
+    Shared by check_routing (routers in config.yaml) and check_seed_routers
+    (routers in routers.seed.json): a router that moves out of the file must
+    not lose the same validation.
+    """
+    router = params.get("complexity_router_config") or {}
+
+    default = params.get("complexity_router_default_model")
+    if default and not known_model(default, known):
+        error(f"{name!r} default model {default!r} is not a declared model_name")
+
+    classifier = (router.get("classifier_llm_config") or {}).get("model")
+    if classifier and not known_model(classifier, known):
+        error(f"{name!r} classifier model {classifier!r} is not a declared model_name")
+
+    for tier, targets in (router.get("tiers") or {}).items():
+        for target in targets:
+            if not known_model(target, known):
+                error(f"{name!r} tier {tier} target {target!r} is not a declared model_name")
+
+
 def check_routing(config: dict, names: list[str]) -> None:
     known = set(names)
 
-    def known_model(target: str) -> bool:
-        # A wildcard entry such as "github_copilot/*" covers any model under it.
-        if target in known:
-            return True
-        return any(n.endswith("/*") and target.startswith(n[:-1]) for n in known)
-
     for fallback in (config.get("router_settings") or {}).get("fallbacks") or []:
         for source, targets in fallback.items():
-            if not known_model(source):
+            if not known_model(source, known):
                 error(f"config.yaml: fallback source {source!r} is not a declared model_name")
             for target in targets:
-                if not known_model(target):
+                if not known_model(target, known):
                     error(f"config.yaml: fallback target {target!r} is not a declared model_name")
 
     for entry in config.get("model_list") or []:
         params = entry.get("litellm_params") or {}
         if not str(params.get("model", "")).startswith("auto_router/"):
             continue
+        check_router_entry(entry.get("model_name"), params, known)
+
+
+def check_seed_routers(names: list[str]) -> None:
+    """Validate tier/classifier/default-model targets in routers.seed.json.
+
+    Once the routers leave config.yaml, these targets are no longer visible to
+    check_routing, so the seed file gets the same checks.
+    """
+    seed_path = ROOT / "routers.seed.json"
+    if not seed_path.exists():
+        return
+    try:
+        routers = json.loads(seed_path.read_text())
+    except json.JSONDecodeError as exc:
+        error(f"routers.seed.json does not parse: {exc}")
+        return
+
+    known = set(names)
+    for entry in routers:
         name = entry.get("model_name")
-        router = params.get("complexity_router_config") or {}
-
-        default = params.get("complexity_router_default_model")
-        if default and not known_model(default):
-            error(f"config.yaml: {name!r} default model {default!r} is not a declared model_name")
-
-        classifier = (router.get("classifier_llm_config") or {}).get("model")
-        if classifier and not known_model(classifier):
-            error(f"config.yaml: {name!r} classifier model {classifier!r} is not a declared model_name")
-
-        for tier, targets in (router.get("tiers") or {}).items():
-            for target in targets:
-                if not known_model(target):
-                    error(f"config.yaml: {name!r} tier {tier} target {target!r} is not a declared model_name")
+        if not name:
+            error("routers.seed.json: entry without a model_name")
+            continue
+        check_router_entry(name, entry.get("litellm_params") or {}, known)
 
 
 def check_readme(names: list[str]) -> None:
@@ -164,6 +200,7 @@ def main() -> int:
     names = check_models(config)
     check_env_refs(config, declared_env)
     check_routing(config, names)
+    check_seed_routers(names)
     check_readme(names)
     check_env_example(declared_env)
     check_secrets()

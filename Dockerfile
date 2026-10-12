@@ -33,6 +33,8 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Baked in as a default; docker-compose bind-mounts the live file over it.
 COPY config.yaml ./config.yaml
+# Custom providers (the Jev classifier), loaded relative to config.yaml.
+COPY providers/ ./providers/
 
 EXPOSE 4000
 ENTRYPOINT ["docker-entrypoint.sh"]
